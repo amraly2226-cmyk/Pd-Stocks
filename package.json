@@ -1,0 +1,12 @@
+{
+  "name": "stock-bot",
+  "version": "1.0.0",
+  "main": "stock-bot.js",
+  "scripts": {
+    "start": "node stock-bot.js",
+    "build": "chmod +x render-build.sh && ./render-build.sh"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}
