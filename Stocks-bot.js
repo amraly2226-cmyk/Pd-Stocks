@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (بيع وشراء)...");
+  console.log("🚀 بوت الأسهم (نظام شراء الأخضر وبيع الأحمر) بيشتغل...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -30,36 +30,55 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            // =============================================
-            // 1) عملية البيع الكلي (Sell All)
-            // =============================================
-            console.log("🔴 [1/3] هبدأ عملية البيع...");
-
-            // الانتظار حتى يظهر زر Sell All الرئيسي اللي تحت
-            await page.waitForSelector('#bottomSellAllBtn', { timeout: 15000 }).catch(() => {});
-
-            // الضغط على الزر الرئيسي (بالـ ID الصحيح)
-            await page.evaluate(() => {
-                let sellAllBtn = document.getElementById('bottomSellAllBtn');
-                if (sellAllBtn) sellAllBtn.click();
-            });
-
-            // انتظار ظهور نافذة التأكيد
-            await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 10000 }).catch(() => {});
-
-            // الضغط على الزر الأحمر SELL ALL في النافذة
-            await page.evaluate(() => {
-                let confirmSell = [...document.querySelectorAll('button, span, div')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL' && b.offsetParent !== null);
-                if (confirmSell) confirmSell.click();
-            });
-            await sleep(3000);
-            console.log("✅ تم بيع كل الأسهم بنجاح!");
-
-            // =============================================
-            // 2) عملية الشراء (الأسهم الخضراء)
-            // =============================================
-            console.log("🟢 [2/3] هبدأ عملية الشراء: البحث عن الأخضر...");
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
+
+            // =============================================
+            // 1) عملية البيع (السهم الأحمر)
+            // =============================================
+            console.log("🔴 [1/2] البحث عن أسهم حمراء لبيعها...");
+            
+            // البحث عن صف فيه لون أحمر في السعر، والضغط على زر Sell All في نفس الصف
+            let sold = false;
+            for (let attempt = 0; attempt < 5; attempt++) {
+                let foundRed = await page.evaluate(() => {
+                    const rows = document.querySelectorAll('tr');
+                    for (let row of rows) {
+                        for (let cell of row.querySelectorAll('td')) {
+                            const text = cell.innerText.trim();
+                            if (text.includes('£') && (text.includes('↓') || text.includes('▼'))) {
+                                // الاهتمام هنا: إيجاد زر "Sell All" في نفس الصف (في أقصى اليمين)
+                                const sellBtnInRow = [...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All');
+                                if (sellBtnInRow) {
+                                    sellBtnInRow.click();
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                });
+
+                if (!foundRed) break;
+                sold = true;
+
+                // انتظار نافذة التأكيد ثم الضغط على SELL ALL
+                await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 10000 }).catch(() => {});
+                await page.evaluate(() => {
+                    let confirmSell = [...document.querySelectorAll('button, span, div')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL' && b.offsetParent !== null);
+                    if (confirmSell) confirmSell.click();
+                });
+                await sleep(3000);
+                console.log("✅ تم بيع سهم أحمر!");
+                
+                // انتظار التحديث بعد البيع
+                await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+                await sleep(1000);
+            }
+
+            // =============================================
+            // 2) عملية الشراء (السهم الأخضر)
+            // =============================================
+            console.log("🟢 [2/2] البحث عن أسهم خضراء لشرائها...");
 
             let greenCount = 0;
             for (let attempt = 0; attempt < 5; attempt++) {
@@ -96,22 +115,23 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                     let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
                     if (yesBtn) yesBtn.click();
                 });
+
+                await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
                 await sleep(2000);
                 console.log(`✅ تم شراء السهم الأخضر رقم ${greenCount}`);
             }
 
-            if (greenCount === 0) {
-                console.log("⏳ مفيش أسهم خضراء دلوقتي، هستنى الدورة الجاية");
+            if (greenCount === 0 && !sold) {
+                console.log("⏳ مفيش أسهم خضراء أو حمراء للتعامل معاها، هستنى 10 دقايق");
             }
 
-            // =============================================
-            // 3) انتظار 10 دقايق للدورة الجديدة
-            // =============================================
-            console.log("⏳ [3/3] هستنى 10 دقايق...");
+            // انتظار 10 دقايق للدورة الجديدة
+            console.log("⏳ هستنى 10 دقايق قبل الدورة الجديدة...");
             await sleep(600000);
 
         } catch (e) {
-            console.log("⚠️ حصل خطأ في الفحص:", e.message);
+            console.log("⚠️ حصل خطأ مؤقت، جاري إعادة المحاولة:", e.message);
+            await sleep(5000);
         }
     }
 
