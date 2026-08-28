@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (النسخة النهائية للبيع)...");
+  console.log("🚀 بوت الأسهم (بنفس منطق الشراء) بيشتغل...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -34,49 +34,35 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
             // =============================================
-            // 1) البيع
+            // 1) البيع (بنفس طريقة الشراء بالظبط)
             // =============================================
             console.log("🔴 [1/2] بدأت عملية البيع...");
 
-            // اضغط على زر Sell All الرئيسي
+            // 1. اضغط على زر Sell All الرئيسي
             await page.evaluate(() => {
-                let sellBtn = document.getElementById('bottomSellAllBtn');
-                if (!sellBtn) {
-                    let allBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All');
-                    if (allBtns.length > 0) sellBtn = allBtns[allBtns.length - 1];
-                }
-                if (sellBtn) sellBtn.click();
+                let sellAllBtn = document.getElementById('bottomSellAllBtn');
+                if (sellAllBtn) sellAllBtn.click();
             });
 
-            // انتظر ظهور النافذة
-            try {
-                await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 8000 });
-            } catch (e) {
-                console.log("⏳ مفيش أسهم للبيع (النافذة مش هتظهر)");
-            }
+            // 2. انتظر ظهور زر SELL ALL جوه النافذة (مثل ما انتظرنا YES)
+            await page.waitForFunction(() => {
+                return [...document.querySelectorAll('button, span, div')].some(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0);
+            }, { timeout: 10000 }).catch(() => {});
 
-            // دوس على زر SELL ALL داخل النافذة (أي عنصر ظاهر: button, span, div)
-            let sellClicked = await page.evaluate(() => {
-                const elements = [...document.querySelectorAll('button, span, div')];
-                const sellConfirmBtn = elements.find(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0 && el.offsetHeight > 0);
-                if (sellConfirmBtn) {
-                    sellConfirmBtn.click();
-                    return true;
-                }
-                return false;
+            // 3. اضغط على زر SELL ALL في النافذة (نفس البحث عن YES بالظبط)
+            await page.evaluate(() => {
+                let confirmSell = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0);
+                if (confirmSell) confirmSell.click();
             });
 
-            if (sellClicked) {
-                await sleep(4000);
-                await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
-                await sleep(1000);
-                console.log("✅ تم بيع كل الأسهم بنجاح!");
-            } else {
-                console.log("❌ فشل البيع (ملقتيش زر SELL ALL في النافذة)");
-            }
+            // انتظر التحديث بعد البيع
+            await sleep(4000);
+            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+            await sleep(1000);
+            console.log("✅ تم بيع كل الأسهم بنجاح!");
 
             // =============================================
-            // 2) الشراء
+            // 2) الشراء (نفس المنطق الناجح)
             // =============================================
             console.log("🟢 [2/2] بدأت عملية شراء الأسهم الخضراء...");
             let boughtCount = 0;
@@ -106,12 +92,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log(`✅ لقيت سهم أخضر ${boughtCount}، داست على Max`);
                 await sleep(1500);
 
+                // دوس على زر Buy
                 await page.evaluate(() => {
                     let buyBtn = document.getElementById('bottomBuyBtn');
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(1500);
 
+                // دوس على زر YES (نفس البحث الناجح)
                 await page.evaluate(() => {
                     let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
                     if (yesBtn) yesBtn.click();
@@ -127,7 +115,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             }
 
             // =============================================
-            // 3) انتظار 10 دقايق
+            // 3) انتظار 10 دقايق للدورة الجديدة
             // =============================================
             console.log("⏳ هستنى 10 دقايق قبل ما نبدأ دورة جديدة...");
             await sleep(600000);
