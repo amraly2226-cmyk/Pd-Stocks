@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (بنسخة الانتظار الصبور)...");
+  console.log("🚀 بوت الأسهم بيشتغل...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -32,10 +32,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
             console.log("🔄 بحاول أشتري...");
 
-            // استنى ظهور زر Max
+            // انتظر ظهور زر Max في الجدول
             await page.waitForSelector('span.stock-fillmax-btn', { timeout: 15000 }).catch(() => {});
-
-            // دوس على أول زر Max
             let foundMax = await page.evaluate(() => {
                 let maxBtn = document.querySelector('span.stock-fillmax-btn');
                 if (maxBtn) { maxBtn.click(); return true; }
@@ -45,7 +43,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             if (foundMax) {
                 console.log("✅ داست على Max، بستنى النافذة تفتح...");
 
-                // انتظر ظهور زر Buy
+                // الضغط على زر Buy الرئيسي
                 await page.waitForSelector('#bottomBuyBtn', { timeout: 10000 }).catch(() => {});
                 await page.evaluate(() => {
                     let buyBtn = document.getElementById('bottomBuyBtn');
@@ -53,14 +51,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 });
                 console.log("✅ داست على زر Buy");
 
-                // انتظر ظهور زر YES
-                await page.waitForSelector('button:has-text("YES"), span:has-text("YES")', { timeout: 10000 }).catch(() => {});
-                await page.evaluate(() => {
-                    let yesBtn = [...document.querySelectorAll('button, span')].find(el => el.innerText.trim().toUpperCase() === 'YES');
-                    if (yesBtn) yesBtn.click();
+                // الانتظار قليلاً حتى تظهر النافذة المنبثقة، ثم البحث عن YES المرئي فقط
+                await sleep(2000);
+                let purchaseSuccess = await page.evaluate(() => {
+                    // فلترة زر YES الذي يظهر فعلاً وليس مخفياً في الصفحة
+                    let yesBtn = [...document.querySelectorAll('button, span')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetParent !== null);
+                    if (yesBtn) { yesBtn.click(); return true; }
+                    return false;
                 });
-                
-                console.log("✅ داست على زر YES، تم الشراء بنجاح!");
+
+                if (purchaseSuccess) {
+                    console.log("✅ داست على زر YES المرئي، تم الشراء بنجاح!");
+                } else {
+                    console.log("⚠️ النافذة المنبثقة مش ظاهرة، يمكن مفيش أسهم متاحة حالياً أو الكمية 0");
+                }
             } else {
                 console.log("⏳ مفيش زر Max ظاهر حالياً، هستنى 10 دقايق");
             }
