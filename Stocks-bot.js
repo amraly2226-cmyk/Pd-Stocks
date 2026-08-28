@@ -30,23 +30,21 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            console.log("🔄 بحاول أشتري الأسهم الخضراء (اللي في عمود Change)...");
+            console.log("🔄 بحاول أشتري الأسهم الخضراء...");
 
-            // البحث عن الصفوف اللي فيها رقم أخضر والضغط على زر Max اللي جنبها
-            let foundGreenMax = await page.evaluate(() => {
+            // البحث عن الصف اللي فيه "span" لونها أخضر، وجواه "span.stock-fillmax-btn"
+            let foundGreen = await page.evaluate(() => {
                 const rows = document.querySelectorAll('tr');
                 for (let row of rows) {
-                    // البحث عن أي عنصر لونه أخضر في الصف
-                    const greenText = [...row.querySelectorAll('td, span')].find(el => {
-                        const color = window.getComputedStyle(el).color;
-                        return color.includes('rgb(0, 128') || color.includes('rgb(0, 100') || color.includes('rgb(0, 255') || color.includes('rgb(0, 200');
-                    });
-
-                    if (greenText) {
-                        // لاقينا صف أخضر، دلوقتي ندور على زر Max جواه
-                        const maxBtn = [...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max' && b.offsetParent !== null);
-                        if (maxBtn) {
-                            maxBtn.click();
+                    const changeEl = row.querySelector('td, span'); // عناصر عمود الـ Change
+                    const maxSpan = row.querySelector('span.stock-fillmax-btn');
+                    
+                    if (maxSpan && changeEl) {
+                        // فحص لون عمود التغيرات
+                        const style = window.getComputedStyle(changeEl);
+                        const color = style.color;
+                        if (color.includes('rgb(0, 128') || color.includes('rgb(0, 100') || color.includes('rgb(0, 255') || color.includes('rgb(0, 200')) {
+                            maxSpan.click(); // دوس على الـ "Max" الأخضر اللي في نفس الصف
                             return true;
                         }
                     }
@@ -54,18 +52,18 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 return false;
             });
 
-            if (foundGreenMax) {
-                console.log("✅ لقيت سهم أخضر، داست على Max");
+            if (foundGreen) {
+                console.log("✅ لقيت سهم أخضر، داست على Max (span)");
                 await sleep(2000);
 
-                // الضغط على زر Buy تحت
+                // الضغط على زر Buy
                 await page.evaluate(() => {
                     let buyBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Buy' && b.offsetParent !== null);
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(2000);
 
-                // الضغط على YES في نافذة التأكيد
+                // الضغط على YES للتأكيد
                 await page.evaluate(() => {
                     let yesBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'YES' && b.offsetParent !== null);
                     if (yesBtn) yesBtn.click();
