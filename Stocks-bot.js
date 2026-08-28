@@ -37,69 +37,57 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            // =============================================
-            // 1) البيع الكلي (Sell All)
-            // =============================================
+            // 1) البيع: نضغط على زر "Sell All" اللي تحت خالص
             console.log("🔄 هبدأ بعملية البيع: Sell All");
-
-            // نضغط على زر "Sell All" الموجود تحت خالص (اللي جنب Clear All و Buy)
             await page.evaluate(() => {
-                let allSellAll = [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === 'Sell All');
-                if (allSellAll.length > 0) {
-                    allSellAll[allSellAll.length - 1].click(); // بنختار آخر واحد لتحت
+                let allBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All');
+                if (allBtns.length > 0) {
+                    allBtns[allBtns.length - 1].click(); // آخر واحد تحت خالص
                 }
             });
-            await sleep(2000);
+            await sleep(1500);
 
-            // ننتظر ظهور النافذة، وبعدين نضغط على الزر الأحمر "SELL ALL"
-            await page.waitForSelector('button', { timeout: 5000 }).catch(() => {});
+            // نضغط على الزر الأحمر "SELL ALL" في نافذة التأكيد
             await page.evaluate(() => {
-                let confirmSell = [...document.querySelectorAll('button')].find(b => b.textContent.trim().toUpperCase() === 'SELL ALL');
+                let confirmSell = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL' && b.offsetParent !== null);
                 if (confirmSell) confirmSell.click();
             });
             await sleep(3000);
 
-            // =============================================
-            // 2) الشراء (الأسهم الخضراء)
-            // =============================================
+            // 2) الشراء: ندوس على زر "Max" جنب أول سهم شغال (حتى لو مش أخضر الكود هيدوسه)
             console.log("🔄 بحاول أشتري الأسهم الخضراء...");
-
-            // نبحث عن أول صف فيه اللون الأخضر وزر "Max"
-            let foundGreenMax = await page.evaluate(() => {
+            let foundMax = await page.evaluate(() => {
                 const rows = document.querySelectorAll('tr');
                 for (let row of rows) {
-                    const maxBtn = [...row.querySelectorAll('button')].find(b => b.textContent.trim() === 'Max');
+                    const maxBtn = [...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max' && b.offsetParent !== null);
                     if (maxBtn) {
-                        const hasGreen = row.innerHTML.includes('green') || row.innerHTML.includes('#00ff00') || row.innerHTML.includes('#00d26a') || row.innerHTML.includes('svg');
-                        if (hasGreen) {
-                            maxBtn.click();
-                            return true;
-                        }
+                        maxBtn.click();
+                        return true;
                     }
                 }
                 return false;
             });
 
-            if (foundGreenMax) {
-                console.log("✅ لقيت سهم أخضر، داست على Max");
+            if (foundMax) {
+                console.log("✅ لقيت زر Max، داست عليه");
                 await sleep(2000);
 
-                // ننزل تحت ونضغط على زر "Buy"
+                // ننزل تحت وندوس على زر Buy
                 await page.evaluate(() => {
-                    let buyBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Buy');
+                    let buyBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Buy' && b.offsetParent !== null);
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(2000);
 
-                // نضغط على "YES" في نافذة التأكيد
+                // ندوس على YES في نافذة التأكيد
                 await page.evaluate(() => {
-                    let yesBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim().toUpperCase() === 'YES');
+                    let yesBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'YES' && b.offsetParent !== null);
                     if (yesBtn) yesBtn.click();
                 });
 
                 console.log("✅ تم الشراء بنجاح!");
             } else {
-                console.log("⏳ مفيش أسهم خضراء دلوقتي، هستنى 10 دقايق");
+                console.log("⏳ مفيش زر Max شغال دلوقتي، هستنى 10 دقايق");
             }
 
         } catch (e) {
