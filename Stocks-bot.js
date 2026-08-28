@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (شراء فقط)...");
+  console.log("🚀 بوت الأسهم بيشتغل...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -30,22 +30,25 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            // 1) البحث عن زر "Max" في الصفوف الخضراء
-            console.log("🔄 بحاول أشتري الأسهم الخضراء...");
+            console.log("🔄 بحاول أشتري الأسهم الخضراء (اللي في عمود Change)...");
 
+            // البحث عن الصفوف اللي فيها رقم أخضر والضغط على زر Max اللي جنبها
             let foundGreenMax = await page.evaluate(() => {
                 const rows = document.querySelectorAll('tr');
                 for (let row of rows) {
-                    const maxBtn = [...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max' && b.offsetParent !== null);
-                    if (!maxBtn) continue;
+                    // البحث عن أي عنصر لونه أخضر في الصف
+                    const greenText = [...row.querySelectorAll('td, span')].find(el => {
+                        const color = window.getComputedStyle(el).color;
+                        return color.includes('rgb(0, 128') || color.includes('rgb(0, 100') || color.includes('rgb(0, 255') || color.includes('rgb(0, 200');
+                    });
 
-                    // فحص بسيط: هل الصف ده فيه رسم بياني أخضر (svg) أو لون أخضر؟
-                    const cellText = row.innerHTML.toLowerCase();
-                    const isGreen = cellText.includes('green') || cellText.includes('#00ff00') || cellText.includes('#00d26a') || cellText.includes('svg');
-
-                    if (isGreen) {
-                        maxBtn.click();
-                        return true;
+                    if (greenText) {
+                        // لاقينا صف أخضر، دلوقتي ندور على زر Max جواه
+                        const maxBtn = [...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max' && b.offsetParent !== null);
+                        if (maxBtn) {
+                            maxBtn.click();
+                            return true;
+                        }
                     }
                 }
                 return false;
@@ -55,14 +58,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log("✅ لقيت سهم أخضر، داست على Max");
                 await sleep(2000);
 
-                // 2) الضغط على زر "Buy" اللي تحت
+                // الضغط على زر Buy تحت
                 await page.evaluate(() => {
                     let buyBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Buy' && b.offsetParent !== null);
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(2000);
 
-                // 3) الضغط على "YES" في نافذة التأكيد
+                // الضغط على YES في نافذة التأكيد
                 await page.evaluate(() => {
                     let yesBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'YES' && b.offsetParent !== null);
                     if (yesBtn) yesBtn.click();
@@ -70,14 +73,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
                 console.log("✅ تم الشراء بنجاح!");
             } else {
-                console.log("⏳ مفيش أسهم خضراء دلوقتي، هستنى 10 دقايق");
+                console.log("⏳ مفيش أسهم خضراء في عمود التغيرات دلوقتي، هستنى 10 دقايق");
             }
 
         } catch (e) {
             console.log("⚠️ حصل خطأ في الفحص:", e.message);
         }
 
-        // انتظار 10 دقائق
         console.log("⏳ هستنى 10 دقايق للفحص الجاي...");
         await sleep(600000);
     }
