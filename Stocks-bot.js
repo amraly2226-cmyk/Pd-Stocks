@@ -9,7 +9,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   const browser = await puppeteer.launch({ 
     headless: true,
-    executablePath: '/data/data/com.termux/files/usr/bin/chromium',
+    // ✅ المسار الصحيح اللي طلع لك في which chromium-browser
+    executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
     protocolTimeout: 240000,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
@@ -20,7 +21,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
     await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
-    console.log("✅ دخلنا لصفحة الأسهم بالكوكيز بدون مشاكل!");
+    console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
 
     while (true) {
         try {
