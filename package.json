@@ -4,9 +4,9 @@
   "main": "Stocks-bot.js",
   "scripts": {
     "start": "node Stocks-bot.js",
-    "build": "chmod +x render-build.sh && ./render-build.sh"
+    "build": "echo 'No build needed'"
   },
   "dependencies": {
-    "puppeteer": "^23.0.0"
+    "puppeteer-core": "^23.0.0"
   }
 }
