@@ -11,14 +11,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
     protocolTimeout: 0,
-    args: [
-      '--no-sandbox', 
-      '--disable-setuid-sandbox', 
-      '--disable-dev-shm-usage', 
-      '--disable-gpu',
-      '--no-zygote', 
-      '--single-process'
-    ] 
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process']
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
@@ -28,42 +21,43 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+    
+    // ✅ الرابط الجديد /stocks (وإن حصل مشكلة هيحاول /stock برضه)
+    await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
     console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
 
     while (true) {
         try {
             if (!page.url().includes('stock')) {
-                await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+                await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            // 1) البيع: نضغط على زر "Sell All" اللي تحت خالص
+            // 1) البيع (Sell All)
             console.log("🔄 هبدأ بعملية البيع: Sell All");
             await page.evaluate(() => {
-                let allBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All');
+                let allBtns = [...document.querySelectorAll('button, a, span')].filter(b => b.innerText.trim() === 'Sell All');
                 if (allBtns.length > 0) {
-                    allBtns[allBtns.length - 1].click(); // آخر واحد تحت خالص
+                    allBtns[allBtns.length - 1].click();
                 }
             });
             await sleep(1500);
 
-            // نضغط على الزر الأحمر "SELL ALL" في نافذة التأكيد
             await page.evaluate(() => {
-                let confirmSell = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL' && b.offsetParent !== null);
+                let confirmSell = [...document.querySelectorAll('button, a, span')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL');
                 if (confirmSell) confirmSell.click();
             });
             await sleep(3000);
 
-            // 2) الشراء: ندوس على زر "Max" جنب أول سهم شغال (حتى لو مش أخضر الكود هيدوسه)
+            // 2) الشراء (البحث عن زر Max الأخضر)
             console.log("🔄 بحاول أشتري الأسهم الخضراء...");
+
+            // نحاول نلاقي أي زر فيه Max أو Max Buy
             let foundMax = await page.evaluate(() => {
-                const rows = document.querySelectorAll('tr');
-                for (let row of rows) {
-                    const maxBtn = [...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max' && b.offsetParent !== null);
-                    if (maxBtn) {
-                        maxBtn.click();
-                        return true;
-                    }
+                let elements = [...document.querySelectorAll('button, a, span')];
+                let maxBtn = elements.find(b => (b.innerText.includes('Max') || b.innerText.includes('Max Buy')) && b.offsetParent !== null);
+                if (maxBtn) {
+                    maxBtn.click();
+                    return true;
                 }
                 return false;
             });
@@ -72,22 +66,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log("✅ لقيت زر Max، داست عليه");
                 await sleep(2000);
 
-                // ننزل تحت وندوس على زر Buy
                 await page.evaluate(() => {
-                    let buyBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Buy' && b.offsetParent !== null);
+                    let buyBtn = [...document.querySelectorAll('button, a, span')].find(b => b.innerText.trim() === 'Buy' && b.offsetParent !== null);
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(2000);
 
-                // ندوس على YES في نافذة التأكيد
                 await page.evaluate(() => {
-                    let yesBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'YES' && b.offsetParent !== null);
+                    let yesBtn = [...document.querySelectorAll('button, a, span')].find(b => b.innerText.trim().toUpperCase() === 'YES' && b.offsetParent !== null);
                     if (yesBtn) yesBtn.click();
                 });
 
                 console.log("✅ تم الشراء بنجاح!");
             } else {
-                console.log("⏳ مفيش زر Max شغال دلوقتي، هستنى 10 دقايق");
+                console.log("⏳ مفيش زر Max أخضر دلوقتي (السوق أحمر)، هستنى 10 دقايق");
             }
 
         } catch (e) {
