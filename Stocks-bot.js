@@ -9,9 +9,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   const browser = await puppeteer.launch({ 
     headless: true,
-    // ✅ المسار الصحيح الذي طلبه جهازك (chromium-browser وليس chromium)
+    // ✅ المسار الصحيح (chromium-browser وليس chromium)
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    protocolTimeout: 240000, // زيادة مهلة الاتصال للنت الضعيف
+    protocolTimeout: 240000,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
@@ -19,7 +19,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   page.setDefaultTimeout(60000);
 
   try {
-    // الدخول بالكوكي مباشرة بدون صفحة لوجين
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
     await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
     console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
