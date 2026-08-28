@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (نسخة إصلاح نافذة التأكيد)...");
+  console.log("🚀 بوت الأسهم بيشتغل (نسخة الانتظار الصبور)...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -30,36 +30,54 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            // انتظر ظهور الجدول
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
-            // 1) البيع: الضغط على زر Sell All الرئيسي
-            console.log("🔴 [1/2] ببدأ عملية البيع...");
+            // =============================================
+            // 1) البيع: بانتظار الظهور الصحيح للنافذة
+            // =============================================
+            console.log("🔴 [1/2] بدأت عملية البيع...");
 
-            // اضغط على زر البيع الرئيسي
+            // الضغط على زر البيع الرئيسي
             await page.evaluate(() => {
-                let sellBtn = document.getElementById('bottomSellAllBtn');
-                if (sellBtn) sellBtn.click();
+                const btn = document.getElementById('bottomSellAllBtn');
+                if (btn) btn.click();
             });
 
-            // انتظر ظهور نافذة التأكيد (النص: Sell All Holdings)
-            await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 10000 }).catch(() => {});
+            // الانتظار بصبر حتى تظهر نافذة "Sell All Holdings" (مش مع Catch أعمى)
+            try {
+                await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 8000 });
+            } catch (e) {
+                // لو مفيش أسهم للبيع أصلاً، النافذة مش هتظهر، نكمل للشراء عادي
+                console.log("⏳ مفيش نافذة تأكيد ظهرت (غالباً مفيش أسهم للبيع)");
+            }
 
-            // اضغط على زر SELL ALL الأحمر داخل النافذة (البحث بالنص، وتجاهل offsetParent لأنه يبوظ مع Modal)
-            await page.evaluate(() => {
-                let allEls = [...document.querySelectorAll('button, span, div')];
-                let sellConfirmBtn = allEls.find(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0 && el.offsetHeight > 0);
-                if (sellConfirmBtn) sellConfirmBtn.click();
+            // دوس على زر "SELL ALL" الأحمر في النافذة
+            const sellClicked = await page.evaluate(() => {
+                const elements = [...document.querySelectorAll('button, span, div')];
+                const sellBtn = elements.find(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0 && el.offsetHeight > 0);
+                if (sellBtn) {
+                    sellBtn.click();
+                    return true;
+                }
+                return false;
             });
 
-            // استنى البيع يتم وتحديث الصفحة
+            if (sellClicked) {
+                console.log("✅ تم الضغط على زر التأكيد!");
+            } else {
+                console.log("⚠️ ملقيتش زر SELL ALL (ممكن النافذة متأخرة)");
+            }
+
+            // استنى البيع يتم ثم تحدث الصفحة
             await sleep(4000);
             await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
             await sleep(1000);
             console.log("✅ تم بيع كل الأسهم بنجاح!");
 
-            // 2) الشراء: البحث عن كل الأسهم الخضراء وشرائها
-            console.log("🟢 [2/2] ببدأ عملية شراء الأسهم الخضراء...");
+            // =============================================
+            // 2) الشراء: شراء كل الأسهم الخضراء
+            // =============================================
+            console.log("🟢 [2/2] بدأت عملية شراء الأسهم الخضراء...");
             let boughtCount = 0;
             for (let attempt = 0; attempt < 5; attempt++) {
                 let foundGreen = await page.evaluate(() => {
@@ -107,7 +125,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log("⏳ مفيش أسهم خضراء في الوقت الحالي.");
             }
 
+            // =============================================
             // 3) انتظار 10 دقايق للدورة الجديدة
+            // =============================================
             console.log("⏳ هستنى 10 دقايق قبل ما نبدأ دورة جديدة...");
             await sleep(600000);
 
