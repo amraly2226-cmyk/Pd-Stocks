@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم (البحث عن آخر زر SELL ALL) بيشتغل...");
+  console.log("🚀 بوت الأسهم (النسخة المبسطة للبيع) بيشتغل...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -30,36 +30,36 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            // انتظر ظهور الجدول
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
             // =============================================
-            // 1) البيع: البحث عن "آخر" زر SELL ALL الظاهر (زر النافذة المنبثقة)
+            // 1) البيع (تعديل جذري: تجاهل الأبعاد نهائياً)
             // =============================================
             console.log("🔴 [1/2] بدأت عملية البيع...");
 
-            // 1. اضغط على زر Sell All الرئيسي
+            // 1. اضغط على زر البيع الرئيسي
             await page.evaluate(() => {
                 let sellAllBtn = document.getElementById('bottomSellAllBtn');
                 if (sellAllBtn) sellAllBtn.click();
             });
 
-            // 2. انتظر 2 ثانية لظهور النافذة
-            await sleep(2000);
+            // 2. انتظر ظهور زر "SELL ALL" داخل النافذة (باستخدام النص فقط)
+            try {
+                await page.waitForFunction(() => {
+                    const btns = Array.from(document.querySelectorAll('button, span, div'));
+                    return btns.some(el => el.textContent.trim().toUpperCase() === 'SELL ALL');
+                }, { timeout: 8000 });
+            } catch (e) {
+                console.log("⚠️ مفيش نافذة (يمكن مفيش أسهم للبيع)");
+            }
 
-            // 3. ابحث عن "آخر" زر SELL ALL في الصفحة (النافذة المنبثقة)
+            // 3. اضغط على الزر "SELL ALL" (بدون أي فحص للأبعاد)
             await page.evaluate(() => {
-                // ناخد كل العناصر الظاهر عرضها أكبر من صفر
-                const elements = [...document.querySelectorAll('button, span, div')];
-                const sellButtons = elements.filter(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0 && el.offsetHeight > 0);
-                
-                // نضغط على آخر واحد (اللي جوه النافذة)
-                if (sellButtons.length > 0) {
-                    sellButtons[sellButtons.length - 1].click();
-                }
+                const btns = Array.from(document.querySelectorAll('button, span, div'));
+                const sellBtn = btns.find(el => el.textContent.trim().toUpperCase() === 'SELL ALL');
+                if (sellBtn) sellBtn.click();
             });
 
-            // 4. انتظر تحديث الصفحة بعد البيع
             await sleep(4000);
             await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
             await sleep(1000);
@@ -103,7 +103,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await sleep(1500);
 
                 await page.evaluate(() => {
-                    let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
+                    let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES');
                     if (yesBtn) yesBtn.click();
                 });
 
