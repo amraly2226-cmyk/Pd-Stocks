@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
 
 const USERNAME = 'amr.aly.2226@gmail.com'; 
 const PASSWORD = 'Gun@12345';
@@ -10,18 +10,17 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   console.log("🚀 بوت الأسهم بيشتغل...");
 
   const browser = await puppeteer.launch({ 
-    headless: true, 
+    headless: true,
+    executablePath: '/data/data/com.termux/files/usr/bin/chromium',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
-  // تأكيد أي نوافذ منبثقة (Confirm) تلقائياً
   page.on('dialog', async dialog => { await dialog.accept(); });
 
   try {
-    // تسجيل الدخول
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
         await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'networkidle2', timeout: 60000 });
@@ -39,15 +38,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         console.log("✅ دخلنا لصفحة الأسهم بعد تسجيل الدخول");
     }
 
-    // اللوب الرئيسي للفحص كل 10 دقائق
     while (true) {
         try {
-            // 1) التأكد إننا في صفحة الأسهم
             if (!page.url().includes('stock')) {
                 await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'networkidle2' });
             }
 
-            // 2) البحث عن زر "Max Buy" الأخضر والضغط عليه
             const clickedMax = await page.evaluate(() => {
                 const buttons = [...document.querySelectorAll('button')];
                 const maxBtn = buttons.find(b => b.innerText.includes('Max') && b.offsetParent !== null);
@@ -62,7 +58,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log("🟢 لقيت الزر الأخضر Max، داست عليه");
                 await sleep(1000);
 
-                // 3) البحث عن زر "Buy" اللي تحت لتأكيد الشراء
                 const clickedBuy = await page.evaluate(() => {
                     const buttons = [...document.querySelectorAll('button')];
                     const buyBtn = buttons.find(b => b.innerText.trim().toUpperCase() === 'BUY' && b.offsetParent !== null);
@@ -86,14 +81,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             console.log("⚠️ حصل خطأ في الفحص:", e.message);
         }
 
-        // 4) الانتظار - 10 دقايق للفحص الجاي
         console.log("⏳ هستنى 10 دقايق للفحص الجاي...");
-        await sleep(600000); // 10 دقائق
+        await sleep(600000);
 
-        // 5) (اختياري) بعد كل شراء، انتظر 7 دقائق إضافية لتجنب الحظر
         if (clickedBuy) {
              console.log("⏳ اشتريت، هستنى 7 دقايق إضافية قبل ما أكمل...");
-             await sleep(420000); // 7 دقائق
+             await sleep(420000);
         }
     }
 
