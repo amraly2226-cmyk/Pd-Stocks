@@ -21,29 +21,21 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'networkidle2', timeout: 120000 });
+    await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
     console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
 
     while (true) {
         try {
             if (!page.url().includes('stock')) {
-                await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'networkidle2', timeout: 120000 });
+                await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
             console.log("🔄 بحاول أشتري...");
 
-            // ⏳ ننتظر ظهور الجدول (عشان الموبايل بطيء) لحد 15 ثانية
-            await page.waitForSelector('span.stock-fillmax-btn', { timeout: 15000 }).catch(() => {});
-
-            // نبحث عن أي زر Max ظاهر
+            // 1) البحث عن زر Max (أول عنصر ظاهر نصه Max)
             let foundMax = await page.evaluate(() => {
-                let allEls = [...document.querySelectorAll('span, a, button, div')];
-                // نبحث عن أي عنصر مكتوب عليه "Max" وليس مخفياً
-                let maxBtn = allEls.find(el => el.innerText.trim() === 'Max' && el.offsetParent !== null);
-                if (maxBtn) {
-                    maxBtn.click();
-                    return true;
-                }
+                let maxBtn = [...document.querySelectorAll('button, span, a, div')].find(el => el.innerText.trim() === 'Max' && el.offsetParent !== null);
+                if (maxBtn) { maxBtn.click(); return true; }
                 return false;
             });
 
@@ -51,21 +43,32 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log("✅ لقيت زر Max، داست عليه");
                 await sleep(2000);
 
-                // الضغط على زر Buy الرئيسي بالـ id
-                await page.evaluate(() => {
-                    let buyBtn = document.getElementById('bottomBuyBtn');
-                    if (buyBtn) buyBtn.click();
+                // 2) البحث عن زر Buy في النافذة المنبثقة (أو في أي مكان) والضغط عليه
+                let clickedBuy = await page.evaluate(() => {
+                    let buyBtn = [...document.querySelectorAll('button, span, a, div')].find(el => el.innerText.trim() === 'Buy' && el.offsetParent !== null);
+                    if (buyBtn) { buyBtn.click(); return true; }
+                    return false;
                 });
-                await sleep(2000);
+                
+                if (clickedBuy) {
+                    console.log("✅ داست على زر Buy");
+                    await sleep(2000);
+                } else {
+                    console.log("❌ مش لاقي زر Buy");
+                }
 
-                // الضغط على زر YES في نافذة التأكيد
-                await page.evaluate(() => {
-                    let allEls = [...document.querySelectorAll('button, span, a, div, input')];
-                    let yesBtn = allEls.find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetParent !== null);
-                    if (yesBtn) yesBtn.click();
+                // 3) البحث عن زر YES في نافذة التأكيد والضغط عليه
+                let clickedYes = await page.evaluate(() => {
+                    let yesBtn = [...document.querySelectorAll('button, span, a, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetParent !== null);
+                    if (yesBtn) { yesBtn.click(); return true; }
+                    return false;
                 });
 
-                console.log("✅ تم الشراء بنجاح!");
+                if (clickedYes) {
+                    console.log("✅ داست على زر YES، تم الشراء!");
+                } else {
+                    console.log("❌ مش لاقي زر YES");
+                }
             } else {
                 console.log("⏳ مفيش زر Max ظاهر على الشاشة حالياً، هستنى 10 دقايق");
             }
