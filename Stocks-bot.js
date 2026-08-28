@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (بيع كلي ثم شراء الأخضر)...");
+  console.log("🚀 بوت الأسهم بيشتغل...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -17,6 +17,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
 
+  // معالج النوافذ المنبثقة: هيقبل أي تأكيد (Confirm) تلقائياً فور ظهورها
   page.on('dialog', async dialog => { await dialog.accept(); });
 
   try {
@@ -34,37 +35,32 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
             // =============================================
-            // 1) البيع: الضغط على زر "Sell All" الرئيسي اللي تحت على اليمين
+            // 1) البيع: الضغط على الزر الرئيسي (#bottomSellAllBtn)
             // =============================================
-            console.log("🔴 [1/2] ببدأ عملية البيع الكلي...");
+            console.log("🔴 [1/2] ببدأ عملية البيع...");
 
-            // البحث عن الزر الرئيسي بالـ ID الخاص به (#bottomSellAllBtn) أو البحث في الشريط السفلي
-            await page.evaluate(() => {
-                let sellAllBtn = document.getElementById('bottomSellAllBtn');
-                
-                // لو مش لاقي بالـ ID، ندور على آخر زرار في الشريط السفلي
-                if (!sellAllBtn) {
-                    let allBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All' && b.offsetParent !== null);
-                    if (allBtns.length > 0) {
-                        sellAllBtn = allBtns[allBtns.length - 1]; // آخر واحد هو اللي تحت
-                    }
+            // انتظر حتى يظهر الزر الرئيسي (مهلة أطول)
+            await page.waitForSelector('#bottomSellAllBtn', { timeout: 10000 }).catch(() => console.log("⚠️ مفيش زر البيع الرئيسي"));
+
+            // اضغط عليه
+            const sellAllClicked = await page.evaluate(() => {
+                const btn = document.getElementById('bottomSellAllBtn');
+                if (btn) {
+                    btn.click();
+                    return true;
                 }
-
-                if (sellAllBtn) sellAllBtn.click();
+                return false;
             });
 
-            // استنى النافذة تظهر واضغط على SELL ALL الأحمر
-            await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 10000 }).catch(() => {});
-            await page.evaluate(() => {
-                let confirmSell = [...document.querySelectorAll('button, span, div')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL' && b.offsetParent !== null);
-                if (confirmSell) confirmSell.click();
-            });
-            
-            // استنى البيع يتم وتحديث الصفحة
-            await sleep(3000);
-            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
-            await sleep(1000);
-            console.log("✅ تم بيع كل الأسهم بنجاح!");
+            if (sellAllClicked) {
+                console.log("👆 داست على زر البيع الرئيسي");
+                // ✅ النافذة هتتقفل تلقائياً من معالج الـ Dialog فوق!
+                // ننتظر 4 ثواني عشان اللعبة تخلص البيع وتحدث
+                await sleep(4000);
+                console.log("✅ تم بيع كل الأسهم بنجاح!");
+            } else {
+                console.log("❌ ملقيتش زر البيع الرئيسي");
+            }
 
             // =============================================
             // 2) الشراء: البحث عن كل الأسهم الخضراء وشرائها
@@ -82,7 +78,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                         });
 
                         if (isGreen) {
-                            // دوس على زر الـ Max اللي في نفس الصف
                             const maxSpan = row.querySelector('span.stock-fillmax-btn');
                             if (maxSpan) {
                                 maxSpan.click();
@@ -99,20 +94,17 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log(`✅ لقيت سهم أخضر ${boughtCount}، داست على Max`);
                 await sleep(1500);
 
-                // دوس على زر Buy الرئيسي
                 await page.evaluate(() => {
                     let buyBtn = document.getElementById('bottomBuyBtn');
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(1500);
 
-                // دوس على زر YES للتأكيد
                 await page.evaluate(() => {
                     let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES');
                     if (yesBtn) yesBtn.click();
                 });
 
-                // استنى التحديث
                 await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
                 await sleep(2000);
                 console.log(`✅ تم شراء السهم الأخضر رقم ${boughtCount}`);
