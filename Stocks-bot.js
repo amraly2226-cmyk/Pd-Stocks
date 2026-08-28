@@ -21,19 +21,29 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+    
+    // ✅ التصحيح: استخدام الرابط الصحيح /stocks
+    await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
     console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
 
     while (true) {
         try {
             if (!page.url().includes('stock')) {
-                await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+                await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
             console.log("🔄 بحاول أشتري...");
 
-            // انتظر ظهور زر Max في الجدول
-            await page.waitForSelector('span.stock-fillmax-btn', { timeout: 15000 }).catch(() => {});
+            // ⏳ ننتظر ظهور زر Max لمدة 20 ثانية (عشان الموبايل بطيء)
+            try {
+                await page.waitForSelector('span.stock-fillmax-btn', { timeout: 20000 });
+            } catch (e) {
+                console.log("⚠️ مفيش زر Max ظاهر في هذا الوقت، هستنى دورة جديدة");
+                await sleep(600000); // انتظر 10 دقايق
+                continue;
+            }
+
+            // دوس على أول زر Max
             let foundMax = await page.evaluate(() => {
                 let maxBtn = document.querySelector('span.stock-fillmax-btn');
                 if (maxBtn) { maxBtn.click(); return true; }
@@ -51,19 +61,18 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 });
                 console.log("✅ داست على زر Buy");
 
-                // الانتظار قليلاً حتى تظهر النافذة المنبثقة، ثم البحث عن YES المرئي فقط
+                // الضغط على زر YES المرئي
                 await sleep(2000);
                 let purchaseSuccess = await page.evaluate(() => {
-                    // فلترة زر YES الذي يظهر فعلاً وليس مخفياً في الصفحة
                     let yesBtn = [...document.querySelectorAll('button, span')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetParent !== null);
                     if (yesBtn) { yesBtn.click(); return true; }
                     return false;
                 });
 
                 if (purchaseSuccess) {
-                    console.log("✅ داست على زر YES المرئي، تم الشراء بنجاح!");
+                    console.log("✅ تم الشراء بنجاح!");
                 } else {
-                    console.log("⚠️ النافذة المنبثقة مش ظاهرة، يمكن مفيش أسهم متاحة حالياً أو الكمية 0");
+                    console.log("⚠️ مش لاقي زر YES (يمكن مفيش أسهم متاحة)");
                 }
             } else {
                 console.log("⏳ مفيش زر Max ظاهر حالياً، هستنى 10 دقايق");
