@@ -1,9 +1,9 @@
 {
-  "name": "stock-bot",
+  "name": "pd-stocks",
   "version": "1.0.0",
-  "main": "stock-bot.js",
+  "main": "Stocks-bot.js",
   "scripts": {
-    "start": "node stock-bot.js",
+    "start": "node Stocks-bot.js",
     "build": "chmod +x render-build.sh && ./render-build.sh"
   },
   "dependencies": {
