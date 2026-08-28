@@ -21,60 +21,53 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'networkidle2', timeout: 120000 });
     console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
 
     while (true) {
         try {
             if (!page.url().includes('stock')) {
-                await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
+                await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'networkidle2', timeout: 120000 });
             }
 
-            console.log("🔄 بحاول أشتري الأسهم الخضراء...");
+            console.log("🔄 بحاول أشتري...");
 
-            // 1) البحث عن زر Max الأخضر (span.stock-fillmax-btn)
-            let foundGreenMax = await page.evaluate(() => {
-                const rows = document.querySelectorAll('tr');
-                for (let row of rows) {
-                    // فحص اللون الأخضر في الخلايا
-                    const hasGreen = [...row.querySelectorAll('td')].some(cell => {
-                        const color = window.getComputedStyle(cell).color;
-                        return color.includes('76, 175') || color.includes('0, 128') || color.includes('0, 200');
-                    });
+            // ⏳ ننتظر ظهور الجدول (عشان الموبايل بطيء) لحد 15 ثانية
+            await page.waitForSelector('span.stock-fillmax-btn', { timeout: 15000 }).catch(() => {});
 
-                    if (hasGreen) {
-                        const maxSpan = row.querySelector('span.stock-fillmax-btn');
-                        if (maxSpan) {
-                            maxSpan.click();
-                            return true;
-                        }
-                    }
+            // نبحث عن أي زر Max ظاهر
+            let foundMax = await page.evaluate(() => {
+                let allEls = [...document.querySelectorAll('span, a, button, div')];
+                // نبحث عن أي عنصر مكتوب عليه "Max" وليس مخفياً
+                let maxBtn = allEls.find(el => el.innerText.trim() === 'Max' && el.offsetParent !== null);
+                if (maxBtn) {
+                    maxBtn.click();
+                    return true;
                 }
                 return false;
             });
 
-            if (foundGreenMax) {
-                console.log("✅ لقيت سهم أخضر، داست على Max");
+            if (foundMax) {
+                console.log("✅ لقيت زر Max، داست عليه");
                 await sleep(2000);
 
-                // 2) الضغط على زر Buy الرئيسي (bottomBuyBtn)
+                // الضغط على زر Buy الرئيسي بالـ id
                 await page.evaluate(() => {
                     let buyBtn = document.getElementById('bottomBuyBtn');
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(2000);
 
-                // 3) البحث عن زر YES في النافذة (سواء كان button أو span)
+                // الضغط على زر YES في نافذة التأكيد
                 await page.evaluate(() => {
-                    // البحث في كل العناصر عن واحد نصه YES وليس مخفياً
-                    let allEls = [...document.querySelectorAll('button, span, a, div')];
+                    let allEls = [...document.querySelectorAll('button, span, a, div, input')];
                     let yesBtn = allEls.find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetParent !== null);
                     if (yesBtn) yesBtn.click();
                 });
 
                 console.log("✅ تم الشراء بنجاح!");
             } else {
-                console.log("⏳ مفيش أسهم خضراء دلوقتي، هستنى 10 دقايق");
+                console.log("⏳ مفيش زر Max ظاهر على الشاشة حالياً، هستنى 10 دقايق");
             }
 
         } catch (e) {
