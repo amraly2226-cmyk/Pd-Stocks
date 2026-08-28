@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم (شراء كل الأخضر وبيع كل الأحمر) بيشتغل...");
+  console.log("🚀 بوت الأسهم بيشتغل (بيع كلي ثم شراء الأخضر)...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -33,66 +33,56 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             // انتظر ظهور الجدول
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
-            // 1) بيع كل الصفوف الحمراء
-            console.log("🔴 بدأت عملية بيع الصفوف الحمراء...");
-            let soldCount = 0;
-            for (let attempt = 0; attempt < 10; attempt++) {
-                let foundRed = await page.evaluate(() => {
-                    const rows = document.querySelectorAll('tr');
-                    for (let row of rows) {
-                        const isRed = [...row.querySelectorAll('td')].some(cell => {
-                            const text = cell.innerText.trim();
-                            return text.includes('£') && (text.includes('▼') || text.includes('↓'));
-                        });
+            // =============================================
+            // 1) البيع: الضغط على زر "Sell All" الرئيسي اللي تحت على اليمين
+            // =============================================
+            console.log("🔴 [1/2] ببدأ عملية البيع الكلي...");
 
-                        if (isRed) {
-                            // ابحث عن أي زر/عنصر في نفس الصف نصه "Sell All"
-                            const sellBtn = [...row.querySelectorAll('button, span, div')].find(b => b.innerText.trim() === 'Sell All' && b.offsetParent !== null);
-                            if (sellBtn) {
-                                sellBtn.click();
-                                return true;
-                            }
-                        }
+            // البحث عن الزر الرئيسي بالـ ID الخاص به (#bottomSellAllBtn) أو البحث في الشريط السفلي
+            await page.evaluate(() => {
+                let sellAllBtn = document.getElementById('bottomSellAllBtn');
+                
+                // لو مش لاقي بالـ ID، ندور على آخر زرار في الشريط السفلي
+                if (!sellAllBtn) {
+                    let allBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All' && b.offsetParent !== null);
+                    if (allBtns.length > 0) {
+                        sellAllBtn = allBtns[allBtns.length - 1]; // آخر واحد هو اللي تحت
                     }
-                    return false;
-                });
+                }
 
-                if (!foundRed) break;
-                soldCount++;
+                if (sellAllBtn) sellAllBtn.click();
+            });
 
-                // انتظار نافذة التأكيد واضغط على SELL ALL
-                await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 10000 }).catch(() => {});
-                await page.evaluate(() => {
-                    let confirmSell = [...document.querySelectorAll('button, span, div')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL');
-                    if (confirmSell) confirmSell.click();
-                });
-                await sleep(3000);
+            // استنى النافذة تظهر واضغط على SELL ALL الأحمر
+            await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 10000 }).catch(() => {});
+            await page.evaluate(() => {
+                let confirmSell = [...document.querySelectorAll('button, span, div')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL' && b.offsetParent !== null);
+                if (confirmSell) confirmSell.click();
+            });
+            
+            // استنى البيع يتم وتحديث الصفحة
+            await sleep(3000);
+            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+            await sleep(1000);
+            console.log("✅ تم بيع كل الأسهم بنجاح!");
 
-                // انتظار تحديث الصفحة بعد البيع
-                await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
-                await sleep(2000);
-                console.log(`✅ تم بيع الصف الأحمر رقم ${soldCount}`);
-            }
-
-            if (soldCount === 0) {
-                console.log("⏳ مفيش أسهم حمراء للبيع حالياً.");
-            } else {
-                console.log(`🏁 خلصت بيع كل الصفوف الحمراء (${soldCount} صف).`);
-            }
-
-            // 2) شراء كل الصفوف الخضراء
-            console.log("🟢 بدأت عملية شراء الصفوف الخضراء...");
+            // =============================================
+            // 2) الشراء: البحث عن كل الأسهم الخضراء وشرائها
+            // =============================================
+            console.log("🟢 [2/2] ببدأ عملية شراء الأسهم الخضراء...");
             let boughtCount = 0;
-            for (let attempt = 0; attempt < 10; attempt++) {
+            for (let attempt = 0; attempt < 5; attempt++) {
                 let foundGreen = await page.evaluate(() => {
                     const rows = document.querySelectorAll('tr');
                     for (let row of rows) {
+                        // البحث عن سهم أخضر (سهم طالع أو سعر أخضر)
                         const isGreen = [...row.querySelectorAll('td')].some(cell => {
                             const text = cell.innerText.trim();
-                            return text.includes('£') && (text.includes('▲') || text.includes('↑'));
+                            return text.includes('£') && (text.includes('↑') || text.includes('▲'));
                         });
 
                         if (isGreen) {
+                            // دوس على زر الـ Max اللي في نفس الصف
                             const maxSpan = row.querySelector('span.stock-fillmax-btn');
                             if (maxSpan) {
                                 maxSpan.click();
@@ -104,37 +94,38 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 });
 
                 if (!foundGreen) break;
-                boughtCount++;
 
+                boughtCount++;
+                console.log(`✅ لقيت سهم أخضر ${boughtCount}، داست على Max`);
                 await sleep(1500);
 
-                // اضغط زر الشراء الرئيسي
+                // دوس على زر Buy الرئيسي
                 await page.evaluate(() => {
                     let buyBtn = document.getElementById('bottomBuyBtn');
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(1500);
 
-                // اضغط على YES
+                // دوس على زر YES للتأكيد
                 await page.evaluate(() => {
                     let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES');
                     if (yesBtn) yesBtn.click();
                 });
 
-                // انتظار التحديث
+                // استنى التحديث
                 await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
                 await sleep(2000);
-                console.log(`✅ تم شراء الصف الأخضر رقم ${boughtCount}`);
+                console.log(`✅ تم شراء السهم الأخضر رقم ${boughtCount}`);
             }
 
             if (boughtCount === 0) {
-                console.log("⏳ مفيش أسهم خضراء للشراء حالياً.");
-            } else {
-                console.log(`🏁 خلصت شراء كل الصفوف الخضراء (${boughtCount} صف).`);
+                console.log("⏳ مفيش أسهم خضراء في الوقت الحالي.");
             }
 
-            // 3) انتظار 10 دقايق
-            console.log("⏳ هستنى 10 دقايق قبل الدورة الجديدة...");
+            // =============================================
+            // 3) انتظار 10 دقايق للدورة الجديدة
+            // =============================================
+            console.log("⏳ هستنى 10 دقايق قبل ما نبدأ دورة جديدة...");
             await sleep(600000);
 
         } catch (e) {
