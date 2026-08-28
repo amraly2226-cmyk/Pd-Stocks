@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل...");
+  console.log("🚀 بوت الأسهم بيشتغل (بنسخة الانتظار الصبور)...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -32,45 +32,37 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
             console.log("🔄 بحاول أشتري...");
 
-            // 1) البحث عن زر Max (أول عنصر ظاهر نصه Max)
+            // استنى ظهور زر Max
+            await page.waitForSelector('span.stock-fillmax-btn', { timeout: 15000 }).catch(() => {});
+
+            // دوس على أول زر Max
             let foundMax = await page.evaluate(() => {
-                let maxBtn = [...document.querySelectorAll('button, span, a, div')].find(el => el.innerText.trim() === 'Max' && el.offsetParent !== null);
+                let maxBtn = document.querySelector('span.stock-fillmax-btn');
                 if (maxBtn) { maxBtn.click(); return true; }
                 return false;
             });
 
             if (foundMax) {
-                console.log("✅ لقيت زر Max، داست عليه");
-                await sleep(2000);
+                console.log("✅ داست على Max، بستنى النافذة تفتح...");
 
-                // 2) البحث عن زر Buy في النافذة المنبثقة (أو في أي مكان) والضغط عليه
-                let clickedBuy = await page.evaluate(() => {
-                    let buyBtn = [...document.querySelectorAll('button, span, a, div')].find(el => el.innerText.trim() === 'Buy' && el.offsetParent !== null);
-                    if (buyBtn) { buyBtn.click(); return true; }
-                    return false;
+                // انتظر ظهور زر Buy
+                await page.waitForSelector('#bottomBuyBtn', { timeout: 10000 }).catch(() => {});
+                await page.evaluate(() => {
+                    let buyBtn = document.getElementById('bottomBuyBtn');
+                    if (buyBtn) buyBtn.click();
+                });
+                console.log("✅ داست على زر Buy");
+
+                // انتظر ظهور زر YES
+                await page.waitForSelector('button:has-text("YES"), span:has-text("YES")', { timeout: 10000 }).catch(() => {});
+                await page.evaluate(() => {
+                    let yesBtn = [...document.querySelectorAll('button, span')].find(el => el.innerText.trim().toUpperCase() === 'YES');
+                    if (yesBtn) yesBtn.click();
                 });
                 
-                if (clickedBuy) {
-                    console.log("✅ داست على زر Buy");
-                    await sleep(2000);
-                } else {
-                    console.log("❌ مش لاقي زر Buy");
-                }
-
-                // 3) البحث عن زر YES في نافذة التأكيد والضغط عليه
-                let clickedYes = await page.evaluate(() => {
-                    let yesBtn = [...document.querySelectorAll('button, span, a, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetParent !== null);
-                    if (yesBtn) { yesBtn.click(); return true; }
-                    return false;
-                });
-
-                if (clickedYes) {
-                    console.log("✅ داست على زر YES، تم الشراء!");
-                } else {
-                    console.log("❌ مش لاقي زر YES");
-                }
+                console.log("✅ داست على زر YES، تم الشراء بنجاح!");
             } else {
-                console.log("⏳ مفيش زر Max ظاهر على الشاشة حالياً، هستنى 10 دقايق");
+                console.log("⏳ مفيش زر Max ظاهر حالياً، هستنى 10 دقايق");
             }
 
         } catch (e) {
