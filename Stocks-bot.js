@@ -11,7 +11,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   const browser = await puppeteer.launch({ 
     headless: true,
-    executablePath: '/data/data/com.termux/files/usr/bin/chromium',
+    // تم تصحيح المسار هنا ليطابق اسم المتصفح في تيرموكس
+    executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
