@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (شراء السعر الأخضر ↑ فقط)...");
+  console.log("🚀 بوت الأسهم بيشتغل (بيع كل شيء ثم شراء الأخضر)...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -30,31 +30,48 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            console.log("🔄 ببحث في خانة السعر عن الرقم الأخضر ↑...");
+            // =============================================
+            // 1) عملية البيع (Sell All) من الزر اللي تحت على اليمين
+            // =============================================
+            console.log("🔴 [1/3] هبدأ عملية البيع: الضغط على Sell All");
 
-            // انتظر ظهور الجدول
+            // دوس على زر Sell All الرئيسي (اللي على اليمين تحت)
+            await page.evaluate(() => {
+                let sellAllBtn = document.getElementById('bottomSellBtn'); // الـ ID بتاعه
+                if (!sellAllBtn) {
+                    // لو مش لاقي الـ ID، يدور على أول زر نصه Sell All
+                    sellAllBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All' && b.offsetParent !== null);
+                }
+                if (sellAllBtn) sellAllBtn.click();
+            });
+            await sleep(2000);
+
+            // اضغط على زر التأكيد "Sell All" اللي بيظهر في النافذة المنبثقة
+            await page.evaluate(() => {
+                let confirmSell = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All' && b.offsetParent !== null);
+                if (confirmSell) confirmSell.click();
+            });
+            await sleep(3000); // استنى البيع يتم
+            console.log("✅ تم بيع كل الأسهم!");
+
+            // =============================================
+            // 2) عملية الشراء (الأسهم الخضراء)
+            // =============================================
+            console.log("🟢 [2/3] هبدأ عملية الشراء: البحث عن الأخضر...");
+
+            // استنى ظهور الجدول
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
-            // البحث عن صف فيه سعر أخضر (خانة Price فيها £ وسهم طالع ↑)
-            let foundGreenPrice = await page.evaluate(() => {
-                const rows = document.querySelectorAll('tr');
-                
-                for (let row of rows) {
-                    for (let cell of row.querySelectorAll('td')) {
-                        const text = cell.innerText.trim();
-                        
-                        // شرط مهم: الخلية دي لازم تحتوي على جنيه إسترليني وسهم طالع أخضر
-                        if (text.includes('£') && (text.includes('↑') || text.includes('▲'))) {
-                            
-                            // ونتأكد إن اللون بتاعها أخضر فعلاً
-                            const styleAttr = cell.getAttribute('style') || '';
-                            const computedColor = window.getComputedStyle(cell).color;
-                            
-                            const isGreen = styleAttr.includes('#28a745') || styleAttr.includes('#4CAF50') || 
-                                           computedColor.includes('rgb(40, 167') || computedColor.includes('rgb(76, 175');
-
-                            if (isGreen) {
-                                // لقينا سهم أخضر طالع، ندور على زر Max في نفس الصف
+            // شراء كل الأسهم اللي سعرها أخضر (فيها £ وسهم ↑)
+            let greenCount = 0;
+            for (let attempt = 0; attempt < 5; attempt++) {
+                let foundGreen = await page.evaluate(() => {
+                    const rows = document.querySelectorAll('tr');
+                    for (let row of rows) {
+                        for (let cell of row.querySelectorAll('td')) {
+                            const text = cell.innerText.trim();
+                            // البحث عن الخلية اللي فيها سعر أخضر مع سهم طالع
+                            if (text.includes('£') && (text.includes('↑') || text.includes('▲'))) {
                                 const maxSpan = row.querySelector('span.stock-fillmax-btn');
                                 if (maxSpan) {
                                     maxSpan.click();
@@ -63,44 +80,44 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                             }
                         }
                     }
-                }
-                return false;
-            });
+                    return false;
+                });
 
-            if (foundGreenPrice) {
-                console.log("✅ لقيت سعر أخضر طالع (↑)، داست على Max!");
-                await sleep(2000);
+                if (!foundGreen) break;
 
-                // الضغط على زر Buy الرئيسي
+                greenCount++;
+                console.log(`✅ لقيت سهم أخضر ${greenCount}، داست على Max`);
+                await sleep(1500);
+
+                // اضغط على زر Buy الرئيسي (اللي تحت في النص)
                 await page.evaluate(() => {
                     let buyBtn = document.getElementById('bottomBuyBtn');
                     if (buyBtn) buyBtn.click();
                 });
-                console.log("✅ داست على زر Buy");
+                await sleep(1500);
 
-                // الضغط على زر YES للتأكيد
-                await sleep(2500);
-                let purchaseSuccess = await page.evaluate(() => {
+                // اضغط على زر YES للتأكيد
+                await page.evaluate(() => {
                     let yesBtn = [...document.querySelectorAll('button, span')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
-                    if (yesBtn) { yesBtn.click(); return true; }
-                    return false;
+                    if (yesBtn) yesBtn.click();
                 });
-
-                if (purchaseSuccess) {
-                    console.log("✅ تم الشراء بنجاح!");
-                } else {
-                    console.log("⚠️ مش لاقي زر YES");
-                }
-            } else {
-                console.log("⏳ مفيش أسهم سعرها أخضر طالع دلوقتي، هستنى 10 دقايق");
+                await sleep(2000);
+                console.log(`✅ تم شراء السهم الأخضر رقم ${greenCount}`);
             }
+
+            if (greenCount === 0) {
+                console.log("⏳ مفيش أسهم خضراء دلوقتي، هستنى الدورة الجاية");
+            }
+
+            // =============================================
+            // 3) انتظار 10 دقايق للدورة الجديدة
+            // =============================================
+            console.log("⏳ [3/3] هستنى 10 دقايق عشان نبيع ونشتري تاني...");
+            await sleep(600000);
 
         } catch (e) {
             console.log("⚠️ حصل خطأ في الفحص:", e.message);
         }
-
-        console.log("⏳ هستنى 10 دقايق للفحص الجاي...");
-        await sleep(600000);
     }
 
   } catch (e) {
