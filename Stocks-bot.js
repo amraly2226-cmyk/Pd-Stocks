@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل...");
+  console.log("🚀 بوت الأسهم بيشتغل (شراء فقط)...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -21,30 +21,16 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
     console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
 
     while (true) {
         try {
             if (!page.url().includes('stock')) {
-                await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
+                await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            // 1) البيع (Sell All)
-            console.log("🔄 هبدأ بعملية البيع: Sell All");
-            await page.evaluate(() => {
-                let allBtns = [...document.querySelectorAll('button, a, span')].filter(b => b.innerText.trim() === 'Sell All');
-                if (allBtns.length > 0) allBtns[allBtns.length - 1].click();
-            });
-            await sleep(1500);
-
-            await page.evaluate(() => {
-                let confirmSell = [...document.querySelectorAll('button, a, span')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL');
-                if (confirmSell) confirmSell.click();
-            });
-            await sleep(3000);
-
-            // 2) الشراء (البحث عن زر Max داخل صف لونه أخضر)
+            // 1) البحث عن زر "Max" في الصفوف الخضراء
             console.log("🔄 بحاول أشتري الأسهم الخضراء...");
 
             let foundGreenMax = await page.evaluate(() => {
@@ -53,9 +39,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                     const maxBtn = [...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max' && b.offsetParent !== null);
                     if (!maxBtn) continue;
 
-                    // فحص إذا كان الصف ده يحتوي على لون أخضر (رسم بياني أو نص)
+                    // فحص بسيط: هل الصف ده فيه رسم بياني أخضر (svg) أو لون أخضر؟
                     const cellText = row.innerHTML.toLowerCase();
-                    const isGreen = cellText.includes('green') || cellText.includes('#00ff00') || cellText.includes('#00d26a') || cellText.includes('#0f0');
+                    const isGreen = cellText.includes('green') || cellText.includes('#00ff00') || cellText.includes('#00d26a') || cellText.includes('svg');
 
                     if (isGreen) {
                         maxBtn.click();
@@ -69,28 +55,29 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log("✅ لقيت سهم أخضر، داست على Max");
                 await sleep(2000);
 
-                // الضغط على زر Buy
+                // 2) الضغط على زر "Buy" اللي تحت
                 await page.evaluate(() => {
-                    let buyBtn = [...document.querySelectorAll('button, a, span')].find(b => b.innerText.trim() === 'Buy' && b.offsetParent !== null);
+                    let buyBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Buy' && b.offsetParent !== null);
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(2000);
 
-                // الضغط على YES للتأكيد
+                // 3) الضغط على "YES" في نافذة التأكيد
                 await page.evaluate(() => {
-                    let yesBtn = [...document.querySelectorAll('button, a, span')].find(b => b.innerText.trim().toUpperCase() === 'YES' && b.offsetParent !== null);
+                    let yesBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'YES' && b.offsetParent !== null);
                     if (yesBtn) yesBtn.click();
                 });
 
                 console.log("✅ تم الشراء بنجاح!");
             } else {
-                console.log("⏳ مفيش أسهم خضراء دلوقتي (كل الأسهم حمراء أو انتظار)، هستنى 10 دقايق");
+                console.log("⏳ مفيش أسهم خضراء دلوقتي، هستنى 10 دقايق");
             }
 
         } catch (e) {
             console.log("⚠️ حصل خطأ في الفحص:", e.message);
         }
 
+        // انتظار 10 دقائق
         console.log("⏳ هستنى 10 دقايق للفحص الجاي...");
         await sleep(600000);
     }
