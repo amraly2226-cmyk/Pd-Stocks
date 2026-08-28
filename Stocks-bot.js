@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (بأسلوب السعر الأخضر)...");
+  console.log("🚀 بوت الأسهم بيشتغل (شراء السعر الأخضر ↑ فقط)...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -30,29 +30,31 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            console.log("🔄 ببحث في خانة البرايس عن رقم أخضر...");
+            console.log("🔄 ببحث في خانة السعر عن الرقم الأخضر ↑...");
 
             // انتظر ظهور الجدول
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
-            // البحث عن صف فيه سعر أخضر والضغط على Max جنبه
+            // البحث عن صف فيه سعر أخضر (خانة Price فيها £ وسهم طالع ↑)
             let foundGreenPrice = await page.evaluate(() => {
                 const rows = document.querySelectorAll('tr');
                 
                 for (let row of rows) {
-                    // نبحث في كل الخلايا
                     for (let cell of row.querySelectorAll('td')) {
-                        // الخلية اللي فيها علامة الجنيه
-                        if (cell.innerText.trim().startsWith('£')) {
-                            // نقرأ اللون مباشرة من الـ Style نفسه عشان نضمن الدقة
+                        const text = cell.innerText.trim();
+                        
+                        // شرط مهم: الخلية دي لازم تحتوي على جنيه إسترليني وسهم طالع أخضر
+                        if (text.includes('£') && (text.includes('↑') || text.includes('▲'))) {
+                            
+                            // ونتأكد إن اللون بتاعها أخضر فعلاً
                             const styleAttr = cell.getAttribute('style') || '';
                             const computedColor = window.getComputedStyle(cell).color;
                             
-                            // اللون الأخضر المستخدم في اللعبة هو #28a745 أو rgb(40, 167, 69)
-                            const isGreen = (styleAttr.includes('#28a745') || styleAttr.includes('rgb(40, 167, 69)') || computedColor.includes('rgb(40, 167'));
+                            const isGreen = styleAttr.includes('#28a745') || styleAttr.includes('#4CAF50') || 
+                                           computedColor.includes('rgb(40, 167') || computedColor.includes('rgb(76, 175');
 
                             if (isGreen) {
-                                // لاقينا سعر أخضر، ندور على زر Max في نفس الصف
+                                // لقينا سهم أخضر طالع، ندور على زر Max في نفس الصف
                                 const maxSpan = row.querySelector('span.stock-fillmax-btn');
                                 if (maxSpan) {
                                     maxSpan.click();
@@ -66,7 +68,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             });
 
             if (foundGreenPrice) {
-                console.log("✅ لقيت سعر أخضر، داست على Max!");
+                console.log("✅ لقيت سعر أخضر طالع (↑)، داست على Max!");
                 await sleep(2000);
 
                 // الضغط على زر Buy الرئيسي
@@ -90,7 +92,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                     console.log("⚠️ مش لاقي زر YES");
                 }
             } else {
-                console.log("⏳ مفيش أسهم سعرها أخضر دلوقتي، هستنى 10 دقايق");
+                console.log("⏳ مفيش أسهم سعرها أخضر طالع دلوقتي، هستنى 10 دقايق");
             }
 
         } catch (e) {
