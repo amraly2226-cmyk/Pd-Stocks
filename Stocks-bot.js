@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم (النسخة المبسطة للبيع) بيشتغل...");
+  console.log("🚀 بوت الأسهم بيشتغل...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -33,31 +33,26 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
             // =============================================
-            // 1) البيع (تعديل جذري: تجاهل الأبعاد نهائياً)
+            // 1) البيع (الاختيار الدقيق للزر الأخير في النافذة)
             // =============================================
             console.log("🔴 [1/2] بدأت عملية البيع...");
 
-            // 1. اضغط على زر البيع الرئيسي
+            // 1. اضغط على زر Sell All الرئيسي (اللي تحت)
             await page.evaluate(() => {
                 let sellAllBtn = document.getElementById('bottomSellAllBtn');
                 if (sellAllBtn) sellAllBtn.click();
             });
 
-            // 2. انتظر ظهور زر "SELL ALL" داخل النافذة (باستخدام النص فقط)
-            try {
-                await page.waitForFunction(() => {
-                    const btns = Array.from(document.querySelectorAll('button, span, div'));
-                    return btns.some(el => el.textContent.trim().toUpperCase() === 'SELL ALL');
-                }, { timeout: 8000 });
-            } catch (e) {
-                console.log("⚠️ مفيش نافذة (يمكن مفيش أسهم للبيع)");
-            }
+            // 2. انتظر ظهور نص النافذة (Sell All Holdings)
+            await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings'), { timeout: 10000 }).catch(() => {});
 
-            // 3. اضغط على الزر "SELL ALL" (بدون أي فحص للأبعاد)
+            // 3. ابحث عن "آخر" زر في الصفحة نصه SELL ALL (اللي جوه النافذة) و اضغط عليه
             await page.evaluate(() => {
-                const btns = Array.from(document.querySelectorAll('button, span, div'));
-                const sellBtn = btns.find(el => el.textContent.trim().toUpperCase() === 'SELL ALL');
-                if (sellBtn) sellBtn.click();
+                const allButtons = [...document.querySelectorAll('button, span, div')];
+                const sellButtons = allButtons.filter(el => el.innerText.trim().toUpperCase() === 'SELL ALL');
+                if (sellButtons.length > 0) {
+                    sellButtons[sellButtons.length - 1].click(); // الضغط على الأخير
+                }
             });
 
             await sleep(4000);
@@ -66,7 +61,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             console.log("✅ تم بيع كل الأسهم بنجاح!");
 
             // =============================================
-            // 2) الشراء (نفس المنطق الناجح)
+            // 2) الشراء (بنفس الطريقة الناجحة)
             // =============================================
             console.log("🟢 [2/2] بدأت عملية شراء الأسهم الخضراء...");
             let boughtCount = 0;
