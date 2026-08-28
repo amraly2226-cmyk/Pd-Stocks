@@ -37,40 +37,44 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stock', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            // 1) البيع: دوس على آخر زر Sell All (اللي تحت خالص اللي بيقول بيع كل الحاجات)
-            console.log("🔄 هبدأ بعملية البيع الكلي: Sell All");
-            
+            // =============================================
+            // 1) البيع الكلي (Sell All)
+            // =============================================
+            console.log("🔄 هبدأ بعملية البيع: Sell All");
+
+            // نضغط على زر "Sell All" الموجود تحت خالص (اللي جنب Clear All و Buy)
             await page.evaluate(() => {
-                // هنختار آخر زر اسمه Sell All
-                let sellBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All' && b.offsetParent !== null);
-                if (sellBtns.length > 0) {
-                    sellBtns[sellBtns.length - 1].click(); // آخر زر هو الرئيسي
+                let allSellAll = [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === 'Sell All');
+                if (allSellAll.length > 0) {
+                    allSellAll[allSellAll.length - 1].click(); // بنختار آخر واحد لتحت
                 }
             });
             await sleep(2000);
 
-            // دوس على زر SELL ALL الأحمر داخل نافذة التأكيد
+            // ننتظر ظهور النافذة، وبعدين نضغط على الزر الأحمر "SELL ALL"
+            await page.waitForSelector('button', { timeout: 5000 }).catch(() => {});
             await page.evaluate(() => {
-                let confirmSell = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL' && b.offsetParent !== null);
+                let confirmSell = [...document.querySelectorAll('button')].find(b => b.textContent.trim().toUpperCase() === 'SELL ALL');
                 if (confirmSell) confirmSell.click();
             });
             await sleep(3000);
 
-            // 2) الشراء: دوس على ماكس الأخضر
+            // =============================================
+            // 2) الشراء (الأسهم الخضراء)
+            // =============================================
             console.log("🔄 بحاول أشتري الأسهم الخضراء...");
 
+            // نبحث عن أول صف فيه اللون الأخضر وزر "Max"
             let foundGreenMax = await page.evaluate(() => {
                 const rows = document.querySelectorAll('tr');
                 for (let row of rows) {
-                    const maxBtn = [...row.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max' && b.offsetParent !== null);
-                    if (!maxBtn) continue;
-
-                    // البحث عن أي عنصر أخضر جوه الصف (رسم بياني، أو أسعار، أو تغيير)
-                    const hasGreen = row.innerHTML.includes('green') || row.innerHTML.includes('#00ff00') || row.innerHTML.includes('#00d26a') || row.innerHTML.includes('svg');
-
-                    if (hasGreen) {
-                        maxBtn.click();
-                        return true;
+                    const maxBtn = [...row.querySelectorAll('button')].find(b => b.textContent.trim() === 'Max');
+                    if (maxBtn) {
+                        const hasGreen = row.innerHTML.includes('green') || row.innerHTML.includes('#00ff00') || row.innerHTML.includes('#00d26a') || row.innerHTML.includes('svg');
+                        if (hasGreen) {
+                            maxBtn.click();
+                            return true;
+                        }
                     }
                 }
                 return false;
@@ -80,16 +84,16 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log("✅ لقيت سهم أخضر، داست على Max");
                 await sleep(2000);
 
-                // انزل تحت ودوس على زر Buy
+                // ننزل تحت ونضغط على زر "Buy"
                 await page.evaluate(() => {
-                    let buyBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Buy' && b.offsetParent !== null);
+                    let buyBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Buy');
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(2000);
 
-                // استنى نافذة التأكيد ودوس YES
+                // نضغط على "YES" في نافذة التأكيد
                 await page.evaluate(() => {
-                    let yesBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'YES' && b.offsetParent !== null);
+                    let yesBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim().toUpperCase() === 'YES');
                     if (yesBtn) yesBtn.click();
                 });
 
