@@ -9,10 +9,16 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   const browser = await puppeteer.launch({ 
     headless: true,
-    // ✅ المسار الصحيح (chromium-browser وليس chromium)
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    protocolTimeout: 240000,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
+    protocolTimeout: 0, // إلغاء مهلة الاتصال نهائياً
+    args: [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox', 
+      '--disable-dev-shm-usage', 
+      '--disable-gpu',
+      '--no-zygote', 
+      '--single-process' // الحل السحري لمشكلة الـ Network.deleteCookies على أندرويد
+    ] 
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
