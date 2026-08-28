@@ -21,8 +21,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    
-    // ✅ التصحيح: استخدام الرابط الصحيح /stocks
     await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
     console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
 
@@ -32,39 +30,50 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
             }
 
-            console.log("🔄 بحاول أشتري...");
+            console.log("🔄 بحاول أشتري الأسهم الخضراء الحقيقية...");
 
-            // ⏳ ننتظر ظهور زر Max لمدة 20 ثانية (عشان الموبايل بطيء)
-            try {
-                await page.waitForSelector('span.stock-fillmax-btn', { timeout: 20000 });
-            } catch (e) {
-                console.log("⚠️ مفيش زر Max ظاهر في هذا الوقت، هستنى دورة جديدة");
-                await sleep(600000); // انتظر 10 دقايق
-                continue;
-            }
+            // انتظار ظهور الجدول
+            await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
-            // دوس على أول زر Max
-            let foundMax = await page.evaluate(() => {
-                let maxBtn = document.querySelector('span.stock-fillmax-btn');
-                if (maxBtn) { maxBtn.click(); return true; }
+            // البحث عن صف فيه لون أخضر في الرسم البياني/الأسعار (مع تجاهل زر Max تماماً)
+            let foundGreen = await page.evaluate(() => {
+                const rows = document.querySelectorAll('tr');
+                for (let row of rows) {
+                    // تجاهل زر Max تماماً، وابحث عن الأخضر في باقي الخلايا
+                    const hasGreen = [...row.querySelectorAll('td, span')].some(el => {
+                        // لو العنصر هو زر Max، تجاهله ولا تعتبره لون أخضر
+                        if (el.classList.contains('stock-fillmax-btn') || el.innerText.trim() === 'Max') return false;
+
+                        const color = window.getComputedStyle(el).color;
+                        return color.includes('76, 175') || color.includes('0, 128') || color.includes('0, 200') || color.includes('0, 255');
+                    });
+
+                    if (hasGreen) {
+                        const maxSpan = row.querySelector('span.stock-fillmax-btn');
+                        if (maxSpan) {
+                            maxSpan.click();
+                            return true;
+                        }
+                    }
+                }
                 return false;
             });
 
-            if (foundMax) {
-                console.log("✅ داست على Max، بستنى النافذة تفتح...");
+            if (foundGreen) {
+                console.log("✅ لقيت سهم أخضر حقيقي، داست على Max!");
+                await sleep(2000);
 
                 // الضغط على زر Buy الرئيسي
-                await page.waitForSelector('#bottomBuyBtn', { timeout: 10000 }).catch(() => {});
                 await page.evaluate(() => {
                     let buyBtn = document.getElementById('bottomBuyBtn');
                     if (buyBtn) buyBtn.click();
                 });
                 console.log("✅ داست على زر Buy");
 
-                // الضغط على زر YES المرئي
-                await sleep(2000);
+                // انتظار النافذة والضغط على YES
+                await sleep(2500);
                 let purchaseSuccess = await page.evaluate(() => {
-                    let yesBtn = [...document.querySelectorAll('button, span')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetParent !== null);
+                    let yesBtn = [...document.querySelectorAll('button, span')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
                     if (yesBtn) { yesBtn.click(); return true; }
                     return false;
                 });
@@ -72,10 +81,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 if (purchaseSuccess) {
                     console.log("✅ تم الشراء بنجاح!");
                 } else {
-                    console.log("⚠️ مش لاقي زر YES (يمكن مفيش أسهم متاحة)");
+                    console.log("⚠️ مش لاقي زر YES");
                 }
             } else {
-                console.log("⏳ مفيش زر Max ظاهر حالياً، هستنى 10 دقايق");
+                console.log("⏳ مفيش أسهم خضراء حقيقية دلوقتي (كلها حمراء)، هستنى 10 دقايق");
             }
 
         } catch (e) {
