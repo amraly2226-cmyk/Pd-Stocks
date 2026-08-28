@@ -5,7 +5,7 @@ const COOKIE_VALUE = "eyJpdiI6InptT2kwYW5BWkJ3aUZRNmdKb21rVUE9PSIsInZhbHVlIjoiTT
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم (بنفس منطق الشراء) بيشتغل...");
+  console.log("🚀 بوت الأسهم (البحث عن آخر زر SELL ALL) بيشتغل...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
@@ -34,7 +34,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
             // =============================================
-            // 1) البيع (بنفس طريقة الشراء بالظبط)
+            // 1) البيع: البحث عن "آخر" زر SELL ALL الظاهر (زر النافذة المنبثقة)
             // =============================================
             console.log("🔴 [1/2] بدأت عملية البيع...");
 
@@ -44,18 +44,22 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 if (sellAllBtn) sellAllBtn.click();
             });
 
-            // 2. انتظر ظهور زر SELL ALL جوه النافذة (مثل ما انتظرنا YES)
-            await page.waitForFunction(() => {
-                return [...document.querySelectorAll('button, span, div')].some(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0);
-            }, { timeout: 10000 }).catch(() => {});
+            // 2. انتظر 2 ثانية لظهور النافذة
+            await sleep(2000);
 
-            // 3. اضغط على زر SELL ALL في النافذة (نفس البحث عن YES بالظبط)
+            // 3. ابحث عن "آخر" زر SELL ALL في الصفحة (النافذة المنبثقة)
             await page.evaluate(() => {
-                let confirmSell = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0);
-                if (confirmSell) confirmSell.click();
+                // ناخد كل العناصر الظاهر عرضها أكبر من صفر
+                const elements = [...document.querySelectorAll('button, span, div')];
+                const sellButtons = elements.filter(el => el.innerText.trim().toUpperCase() === 'SELL ALL' && el.offsetWidth > 0 && el.offsetHeight > 0);
+                
+                // نضغط على آخر واحد (اللي جوه النافذة)
+                if (sellButtons.length > 0) {
+                    sellButtons[sellButtons.length - 1].click();
+                }
             });
 
-            // انتظر التحديث بعد البيع
+            // 4. انتظر تحديث الصفحة بعد البيع
             await sleep(4000);
             await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
             await sleep(1000);
@@ -92,14 +96,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log(`✅ لقيت سهم أخضر ${boughtCount}، داست على Max`);
                 await sleep(1500);
 
-                // دوس على زر Buy
                 await page.evaluate(() => {
                     let buyBtn = document.getElementById('bottomBuyBtn');
                     if (buyBtn) buyBtn.click();
                 });
                 await sleep(1500);
 
-                // دوس على زر YES (نفس البحث الناجح)
                 await page.evaluate(() => {
                     let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
                     if (yesBtn) yesBtn.click();
