@@ -1,108 +1,124 @@
 const puppeteer = require('puppeteer-core');
 
-const COOKIE_VALUE = "ضع_الكوكي_الجديد_هنا";
+// ✅ الكوكي الجديد بتاعك
+const COOKIE_VALUE = "eyJpdiI6IjhOSXBseVlmekV6ck9uY1pmWnB2dnc9PSIsInZhbHVlIjoiaTN4OXcyZTF6VFRGWGRkUEJFTU1PMXNhTXpvclFsazZJajUxV1FZQzZybmRHZE1jV1F0cVZPZnlPNFIyS08wa1J0S01vNW9YTXJ0SzdwNy9ZbUZxdjVhdTl6WXQ0c2J4SXJEa2hZelp1Ly8zNWpIZWxza25lVURhOTdVY3NCL1UiLCJtYWMiOiIzMGNhMmQ0YmE5MmVmMzRhZDE2NDZkMDAzNmNmZDQ2MTFlNWE0NjMyODE3NjA3MGU1NGVhMzRmNGRhOWQ1MWE3IiwidGFnIjoiIn0%3D";
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 بوت الأسهم بيشتغل (نسخة إصلاح نافذة التأكيد)...");
+  console.log("🚀 بوت الأسهم بيشتغل (مع ريفريش كل دورة)...");
 
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    protocolTimeout: 120000,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
+    protocolTimeout: 0,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process']
   });
-
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
 
-  // 🔥 السر السحري هنا: يقبل أي نافذة تأكيد منبثقة (Confirm/Alert) تلقائياً
   page.on('dialog', async dialog => { await dialog.accept(); });
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await sleep(5000);
-    console.log("✅ دخلنا صفحة الأسهم!");
-  } catch (e) {
-    console.log("⚠️ مشكلة في الدخول:", e.message);
-  }
+    await page.goto('https://project-dark.co.uk/stocks', { waitUntil: 'domcontentloaded', timeout: 120000 });
+    console.log("✅ دخلنا لصفحة الأسهم بنجاح!");
 
-  while (true) {
-    try {
-      // 1) بيع كل الأسهم (باستخدام الزر الرئيسي في الأسفل)
-      console.log("🔴 [1/2] بيع كل الأسهم...");
+    while (true) {
+        try {
+            // 🔄 تحديث الصفحة قبل كل دورة جديدة (البحث عن أسعار جديدة)
+            await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+            await sleep(2000);
 
-      // انتظر ظهور الزر الرئيسي "Sell All" في الأسفل
-      let sellAllHandle = await page.waitForSelector('#bottomSellAllBtn', { visible: true, timeout: 10000 }).catch(() => null);
-      if (!sellAllHandle) {
-        sellAllHandle = await page.waitForSelector('text=Sell All >> nth=-1', { timeout: 5000 }).catch(() => null);
-      }
+            // انتظر ظهور الجدول
+            await page.waitForSelector('tr', { timeout: 20000 }).catch(() => {});
 
-      if (sellAllHandle) {
-        await sellAllHandle.click();
-        await sleep(2000);
-        
-        // 🔥 ننتظر ظهور زر التأكيد من خلال "Dialog" الذي سيقبله الـ page.on،
-        // لكن أحياناً يظهر زر HTML. نبحث عنه هنا.
-        let confirmSellHandle = await page.waitForSelector('button:has-text("SELL ALL"), span:has-text("SELL ALL")', { visible: true, timeout: 5000 }).catch(() => null);
-        if (confirmSellHandle) {
-          await confirmSellHandle.click();
-          console.log("✅ تم الضغط على زر التأكيد!");
-        }
-      }
-      
-      await sleep(3000);
+            // 1) البيع (الطريقة المعتمدة الأصلية)
+            console.log("🔴 [1/2] بدأت عملية البيع...");
 
-      // 2) شراء الأسهم الخضراء
-      console.log("🟢 [2/2] شراء الأسهم الخضراء...");
+            await page.evaluate(() => {
+                const allSellBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All');
+                if (allSellBtns.length > 0) {
+                    allSellBtns[allSellBtns.length - 1].click();
+                }
+            });
+            await sleep(2000);
 
-      // ابحث عن أول صف فيه سهم صاعد وزر Max
-      let maxFound = await page.evaluate(() => {
-        const rows = document.querySelectorAll('tr');
-        for (let row of rows) {
-          const isGreen = [...row.querySelectorAll('td')].some(cell => {
-            const text = cell.innerText.trim();
-            return (text.includes('↑') || text.includes('▲'));
-          });
+            await page.waitForFunction(() => document.body.innerText.includes('Sell All Holdings') || document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
+            
+            await page.evaluate(() => {
+                const allBtns = [...document.querySelectorAll('button')];
+                const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null);
+                if (confirmBtn) confirmBtn.click();
+            });
+            
+            await sleep(4000);
+            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+            await sleep(1000);
+            console.log("✅ تم بيع كل الأسهم بنجاح!");
 
-          if (isGreen) {
-            const maxSpan = row.querySelector('span.stock-fillmax-btn');
-            if (maxSpan) { 
-              const rect = maxSpan.getBoundingClientRect();
-              return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+            // 2) الشراء (الطريقة المعتمدة الأصلية)
+            console.log("🟢 [2/2] بدأت عملية شراء الأسهم الخضراء...");
+            let boughtCount = 0;
+            for (let attempt = 0; attempt < 5; attempt++) {
+                let foundGreen = await page.evaluate(() => {
+                    const rows = document.querySelectorAll('tr');
+                    for (let row of rows) {
+                        const isGreen = [...row.querySelectorAll('td')].some(cell => {
+                            const text = cell.innerText.trim();
+                            // ✅ التعديل الوحيد: تغيير £ إلى $
+                            return text.includes('$') && (text.includes('↑') || text.includes('▲'));
+                        });
+
+                        if (isGreen) {
+                            const maxSpan = row.querySelector('span.stock-fillmax-btn');
+                            if (maxSpan) {
+                                maxSpan.click();
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                });
+
+                if (!foundGreen) break;
+
+                boughtCount++;
+                console.log(`✅ لقيت سهم أخضر ${boughtCount}، داست على Max`);
+                await sleep(1500);
+
+                await page.evaluate(() => {
+                    let buyBtn = document.getElementById('bottomBuyBtn');
+                    if (buyBtn) buyBtn.click();
+                });
+                await sleep(1500);
+
+                await page.evaluate(() => {
+                    let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
+                    if (yesBtn) yesBtn.click();
+                });
+
+                await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {});
+                await sleep(2000);
+                console.log(`✅ تم شراء السهم الأخضر رقم ${boughtCount}`);
             }
-          }
+
+            if (boughtCount === 0) {
+                console.log("⏳ مفيش أسهم خضراء في الوقت الحالي.");
+            }
+
+            console.log("⏳ هستنى 10 دقايق قبل ما نبدأ دورة جديدة...");
+            await sleep(600000);
+
+        } catch (e) {
+            console.log("⚠️ حصل خطأ مؤقت، جاري إعادة المحاولة:", e.message);
+            await sleep(5000);
         }
-        return null;
-      });
-
-      if (maxFound) {
-        await page.mouse.click(maxFound.x, maxFound.y); // نقرة حقيقية
-        await sleep(2000);
-        
-        let buyBtnHandle = await page.waitForSelector('#bottomBuyBtn', { visible: true, timeout: 5000 }).catch(() => null);
-        if (buyBtnHandle) await buyBtnHandle.click();
-        
-        await sleep(1500);
-
-        let yesBtnHandle = await page.waitForSelector('button:has-text("YES"), span:has-text("YES")', { visible: true, timeout: 5000 }).catch(() => null);
-        if (yesBtnHandle) {
-          await yesBtnHandle.click();
-          console.log("✅ تم الضغط على زر تأكيد الشراء!");
-        }
-      } else {
-        console.log("⏳ مفيش أسهم خضراء في الوقت الحالي، هستنى.");
-      }
-
-      // انتظار 10 دقايق
-      console.log("⏳ هستنى 10 دقايق...");
-      await sleep(600000);
-    } catch (e) {
-      console.log("⚠️ حصل خطأ مؤقت:", e.message);
-      await sleep(5000);
     }
+
+  } catch (e) {
+    console.log("❌ مشكلة كبيرة في السكريبت:", e.message);
+    await browser.close();
   }
 })();
